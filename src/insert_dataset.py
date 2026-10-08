@@ -1,55 +1,10 @@
 #ÁLVARO BILBAO PARDO
-#load_data.py
+#inserta_dataset.py
 
 import json
 import pymysql
 from pymongo import MongoClient
 from config import *
-
-def crear_base_datos_mysql():
-    conexion = pymysql.connect(host=host, user=user, password=password)
-    cursor = conexion.cursor()
-    sql = f"CREATE DATABASE IF NOT EXISTS {db_sql}"
-    cursor.execute(sql)
-    conexion.commit()
-    cursor.close()
-    conexion.close()
-
-
-def crear_tablas_mysql():
-    conexion = pymysql.connect(host=host, user=user, password=password, database=db_sql)
-    cursor = conexion.cursor()
-
-    cursor.execute("DROP TABLE IF EXISTS REVIEW")
-    cursor.execute("DROP TABLE IF EXISTS ARTICULO")
-    cursor.execute("DROP TABLE IF EXISTS USUARIO")
-
-    sql_usuario = "CREATE TABLE USUARIO (reviewer_id VARCHAR(100), reviewer_name TEXT, PRIMARY KEY (reviewer_id))"
-    cursor.execute(sql_usuario)
-
-    sql_articulo = "CREATE TABLE ARTICULO (asin VARCHAR(50), tipo VARCHAR(100), PRIMARY KEY (asin))"
-    cursor.execute(sql_articulo)
-
-    sql_review = """CREATE TABLE REVIEW (
-        reviewer_id VARCHAR(100),
-        asin VARCHAR(50),
-        unix_review_time BIGINT,
-        overall FLOAT,
-        review_time DATE,
-        PRIMARY KEY (reviewer_id, asin, unix_review_time),
-        FOREIGN KEY (reviewer_id) REFERENCES USUARIO(reviewer_id),
-        FOREIGN KEY (asin) REFERENCES ARTICULO(asin))"""
-    cursor.execute(sql_review)
-
-    conexion.commit()
-    cursor.close()
-    conexion.close()
-
-def preparar_mongodb():
-    client = MongoClient(mongo_uri)
-    db = client[db_mongo]
-    db[coleccion].drop()
-    client.close()
 
 def pasar_fecha(review_time):
     partes = review_time.split(" ")
@@ -64,13 +19,12 @@ def pasar_fecha(review_time):
     return fecha
 
 
-def cargar_fichero(ruta_fichero, tipo):
+def insertar_nuevo_dataset(ruta_fichero, tipo):
     client = MongoClient(mongo_uri)
     db = client[db_mongo]
     coleccion_mongo = db[coleccion]
 
-    conexion = pymysql.connect(host=host,user=user,password=password,database=db_sql)
-
+    conexion = pymysql.connect(host=host, user=user, password=password, database=db_sql)
     cursor = conexion.cursor()
 
     sql_usuario = """INSERT INTO USUARIO (reviewer_id, reviewer_name)
@@ -80,7 +34,7 @@ def cargar_fichero(ruta_fichero, tipo):
     sql_articulo = """INSERT INTO ARTICULO (asin, tipo)
     VALUES (%s, %s)
     ON DUPLICATE KEY UPDATE tipo = VALUES(tipo)"""
-    
+
     sql_review = """INSERT INTO REVIEW (reviewer_id, asin, unix_review_time, overall, review_time)
     VALUES (%s, %s, %s, %s, %s)
     ON DUPLICATE KEY UPDATE
@@ -96,6 +50,7 @@ def cargar_fichero(ruta_fichero, tipo):
                 reviewer_name = doc["reviewerName"]
             else:
                 reviewer_name = ""
+
             asin = doc["asin"]
             overall = doc["overall"]
             unix_review_time = doc["unixReviewTime"]
@@ -105,7 +60,7 @@ def cargar_fichero(ruta_fichero, tipo):
 
             cursor.execute(sql_usuario, (reviewer_id, reviewer_name))
             cursor.execute(sql_articulo, (asin, tipo))
-            cursor.execute(sql_review,(reviewer_id, asin, unix_review_time, overall, review_time_fecha))
+            cursor.execute(sql_review, (reviewer_id, asin, unix_review_time, overall, review_time_fecha))
 
             documento_mongo = {
                 "reviewer_id": reviewer_id,
@@ -124,11 +79,4 @@ def cargar_fichero(ruta_fichero, tipo):
 
 
 if __name__ == "__main__":
-    crear_base_datos_mysql()
-    crear_tablas_mysql()
-    preparar_mongodb()
-
-    cargar_fichero(ruta_toys_and_games, "Toys and Games")
-    cargar_fichero(ruta_video_games, "Video Games")
-    cargar_fichero(ruta_digital_music, "Digital Music")
-    cargar_fichero(ruta_musical_instruments, "Musical Instruments")
+    insertar_nuevo_dataset(ruta_grocery_and_gourmet_food, "Grocery and Gourmet Food")
